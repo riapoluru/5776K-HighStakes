@@ -1,9 +1,7 @@
 #include "main.h"
 #include "subsystems/drivetrain.hpp"
-#include "subsystems/intake.hpp"
-#include "subsystems/shooter.hpp"
 #include "subsystems/globals.hpp"
-#include "subsystems/outtake.hpp"
+
 using namespace okapi::literals; //used for units
 
 /**
