@@ -1,86 +1,117 @@
 #include "main.h"
-#include "lemlib/api.hpp"
-#include "pros/misc.h"
-#include "pros/misc.hpp"
+#include "globals.hpp"
 #include "pros/motors.h"
 #include "pros/rtos.hpp"
-#include "subsystems/globals.hpp"
+#include "subsystems/auton.hpp"
+#include "subsystems/cata.hpp"
+#include "subsystems/drive.hpp"
+#include "subsystems/intake.hpp"
+#include "subsystems/odo.hpp"
+#include "subsystems/pistons.hpp"
+#include "subsystems/skills.hpp"
+
+#include "autoSelect/selection.h"
 
 #include "lemlib/api.hpp"
+#include "lemlib/chassis/chassis.hpp"
 
-using namespace okapi::literals; // used for units
+// drive motors
 
-int lF = 0;
-int lM = 0;
-int lB = 0;
+// const std::uint8_t rightFrontPort = 12;
+// const std::uint8_t leftFrontPort = 3;
 
-int rF = 0;
-int rM = 0;
-int rB = 0;
+// const std::uint8_t leftBackPort = 5;
+// const std::uint8_t rightBackPort = 14;
 
-pros::MotorGroup leftMotors({lF, lM, lB}, pros::MotorGearset::blue);
-pros::MotorGroup rightMotors({rF, rM, rB}, pros::MotorGearset::blue);
+// const std::uint8_t leftTopPort = 4;
+// const std::uint8_t rightTopPort = 13;
 
-pros::Imu imu(0);
+pros::Motor lF(-6, pros::E_MOTOR_GEARSET_06);
+pros::Motor lM(-19, pros::E_MOTOR_GEARSET_06);
+pros::Motor lB(-9, pros::E_MOTOR_GEARSET_06);
 
-lemlib::Drivetrain drivetrain(&leftMotors, &rightMotors, 10, 3.25, 450, 8);
+pros::Motor rF(12, pros::E_MOTOR_GEARSET_06);
+pros::Motor rM(13, pros::E_MOTOR_GEARSET_06);
+pros::Motor rB(14, pros::E_MOTOR_GEARSET_06);
 
-lemlib::ControllerSettings movePID(10,  // kp
-                                   0,   // Ki
-                                   3,   // Kd
-                                   3,   // windup range
-                                   1,   // small error ragne
-                                   100, // small error range timeout (ms)
-                                   3,   // large error range
-                                   500, // large error range timeout (ms)
-                                   20   // slew
-);
+// motor groups
+pros::MotorGroup leftMotors({lF, lM, lB});  // left motor group
+pros::MotorGroup rightMotors({rF, rM, rB}); // right motor group
 
-lemlib::ControllerSettings
-    turnPID(2,   // proportional gain (kP)
-            0,   // integral gain (kI)
-            10,  // derivative gain (kD)
-            3,   // anti windup
-            1,   // small error range, in degrees
-            100, // small error range timeout, in milliseconds
-            3,   // large error range, in degrees
-            500, // large error range timeout, in milliseconds
-            0    // maximum acceleration (slew)
-    );
+lemlib::Drivetrain drive{
+    &leftMotors, &rightMotors, 11.5, lemlib::Omniwheel::NEW_325, 450, 4,
+};
 
-lemlib::OdomSensors sensors(nullptr, nullptr, nullptr, mullptr, &imu);
+lemlib::ControllerSettings movePID{
+    7,   // kP
+    0,   // kI
+    1,   // kD
+    3,   // anti windup
+    1,   // small error range
+    100, // small error timeout
+    4,   // large error range
+    500, // large error timeout
+    0    // slew rate
+};
 
-// Driver control fn tanish
-//  lemlib::ExpoDriveCurve throttleCurve(3, // joystick deadband out of 127
-//                                       10, // minimum output where drivetrain
-//                                       will move out of 127 1.019 // expo
-//                                       curve gain
-//  );
+pros::Imu intertial1(1);
 
-// // input curve for steer input during driver control
-// lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
-//                                   10, // minimum output where drivetrain will
-//                                   move out of 127 1.019 // expo curve gain
-// );
+// pros::Imu intertial2(imuPort2);
 
-lemlib::Chassis chassis(drivetrain, movePID, turnPID,
-                        sensors /*,&throttleCurve, //&steerCurve*/);
+lemlib::OdomSensors sensors{nullptr, // no tracking wheels
+                            nullptr, nullptr, nullptr, &intertial1};
 
-/**
- * A callback function for LLEMU's center button.
- *
- * When this callback is fired, it will toggle line 2 of the LCD text between
- * "I was pressed!" and nothing.
- */
-void on_center_button() {
-  static bool pressed = false;
-  pressed = !pressed;
-  if (pressed) {
-    pros::lcd::set_text(2, "I was pressed!");
+lemlib::ControllerSettings turnPID{
+    2,   // kP
+    0,   // kI
+    11,  // kD
+    3,   // anti windup
+    1,   // small error range
+    100, // small error timeout
+    3,   // large error range
+    500, // large error timeout
+    0    // slew rate
+};
+
+lemlib::Chassis Chassis(drive, movePID, turnPID, sensors);
+
+inline double remap(double d) {
+  if (d == 0) {
+    return 0;
+  }
+
+  double fp = d - (int)d;
+  int id = (int)d;
+
+  if (d > 0) {
+    id = id % 360;
   } else {
-    pros::lcd::clear_line(2);
+    id = (-id % 360) * -1 + 360;
+  }
+
+  d = id + fp;
+  return (d <= 180) ? d : (d - 360);
+}
+
+/*
+  ______________________________________________________________________________________________
+
+  Controller Stuff
+  ______________________________________________________________________________________________
+
+*/
+
+void screen() {
+  while (true) {
+    lemlib::Pose pose = Chassis.getPose(); // get chassis position
+    pros::lcd::print(0, "X: %f", pose.x);
+    pros::lcd::print(1, "Y: %f", pose.y);
+    // pros::lcd::print(2, "Theta: %f", pose.theta);
+    pros::delay(10);
   }
 }
+
+// okapi::IntegratedEncoder leftEncoder = IntegratedEncoder(rightTopPort, true);
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -89,23 +120,50 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-  pros::lcd::initialize();
-  ` chassis.calibrate();
+  Chassis.calibrate();
 
-  pros::lcd::register_btn1_cb(on_center_button);
+  pros::lcd::initialize();
+
+  // print odom values to the brain
+  pros::lcd::initialize();
+  // pros::Task screen_task(screen);
+  selector::init();
+  // selector::init();
+  // IEInnit();
 
   pros::Task screenTask([&]() {
+    lemlib::Pose pose(0, 0, 0);
     while (true) {
+
       // print robot location to the brain screen
-      pros::lcd::print(0, "X: %f", chassis.getPose().x);         // x
-      pros::lcd::print(1, "Y: %f", chassis.getPose().y);         // y
-      pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+
+      pros::lcd::print(0, "X: %f", Chassis.getPose().x); // x
+      pros::lcd::print(1, "Y: %f", Chassis.getPose().y); // y
+      pros::lcd::print(2, "Theta: %f", Chassis.getPose().theta);
+      pros::lcd::print(3, "Encoder LF: %f", lF.get_position());
+      pros::lcd::print(4, "Encoder LM: %f", lM.get_position());
+      pros::lcd::print(5, "Encoder LB: %f", lB.get_position());
+      pros::lcd::print(6, "Encoder RF: %f", rF.get_position());
+      pros::lcd::print(7, "Encoder RM: %f", rM.get_position());
+
       // log position telemetry
-      lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
-      // delay to save resources
+      lemlib::telemetrySink()->info("Chassis pose: {}", Chassis.getPose());
+      // delay to save resources$
       pros::delay(50);
     }
   });
+
+  // imuInnit();
+  intakeInit();
+  cataInit();
+  hangInit();
+  // flipoutMechInnit();
+  // resetEncoders();
+  // pistonsInnit();
+  // lMechInit();
+  // balanceInit();
+  // blockerInit();
+  // PtoInit();
 }
 
 /**
@@ -124,20 +182,52 @@ void disabled() {}
  * This task will exit when the robot is enabled and autonomous or opcontrol
  * starts.
  */
-void competition_initialize() {}
+
+int side = -1;
+// int num = -1;
+void competition_initialize() {
+  // if (selector::auton == 1){side = 2;}
+  // if (selector::auton == 2){side = 1;}
+  // if (selector::auton == 3) {side = 4;}
+  // if (selector::auton == -1) {side = 2;}
+  // if (selector::auton == -2) {side = 1;}
+  // if (selector::auton == -3) {side = 4;}
+  // if (selector::auton == 0) {side = 0;}
+}
 
 /**
- * Runs the user autonomous code. This function will be started in its own task
- * with the default priority and stack size whenever the robot is enabled via
- * the Field Management System or the VEX Competition Switch in the autonomous
- * mode. Alternatively, this function may be called in initialize or opcontrol
- * for non-competition testing purposes.
- *
- * If the robot is disabled or communications is lost, the autonomous task
- * will be stopped. Re-enabling the robot will restart the task, not re-start it
- * from where it left off.
- */
-void autonomous() {}
+* Runs the user autonomous code. This function will be started in its own task
+* with the default priority and stack size whenever the robot is enabled via
+* the Field Management System or the VEX Competition Switch in the autonomous
+* mode. Alternatively, this function may be called in initialize or opcontrol
+
+* for non-competition testing purposes.
+*
+* If the robot is disabled or communications is lost, the autonomous task
+* will be stopped. Re-enabling the robot will restart the task, not re-start it
+* from where it left off.
+*/
+
+void autonomous() {
+
+  if (selector::auton == 1) {
+    closeSide();
+  } else if (selector::auton == 2) {
+    farTB();
+  } else if (selector::auton == 3) {
+    noPreload();
+  }
+
+  // skills(); // SKILLS
+
+  // closeSide(); //AWP
+
+  // closeSideDisrupt(); //DISRUPT
+
+  // farSide(); //AWP FAR SIDE
+
+  // farTB(); // SIX TRIBALL
+}
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -148,27 +238,70 @@ void autonomous() {}
  * If no competition control is connected, this function will run immediately
  * following initialize().
  *
- * If the robot is disabled or communications is lost, the
+ * If the robot is disablsed or communications is lost, the
  * operator control task will be stopped. Re-enabling the robot will restart the
  * task, not resume it from where it left off.
  */
+// bool hasRunMacro = false;
+
+// int ArcadeTankToggle = 0;
+
 void opcontrol() {
-  pros::Controller controller;
 
-  okapi::Rate rate;
-
+  pros::Controller controller1(pros::E_CONTROLLER_MASTER);
   while (true) {
+    // int rightY = controller1.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+    // int leftY = controller1.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
 
-    // get joystick positions
-    int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-    int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
-    // move the chassis with curvature drive
-    chassis.arcade(leftY, rightX);
-    // delay to save resources
+    // Chassis.tank(rightY, leftY);
+
+    int leftJoy = controller1.get_analog(
+        pros::E_CONTROLLER_ANALOG_LEFT_Y); // vert left joystick
+    int rightJoy = controller1.get_analog(
+        pros::E_CONTROLLER_ANALOG_RIGHT_X); // horiz right joystick
+    int tankRightJoy = controller1.get_analog(
+        pros::E_CONTROLLER_ANALOG_RIGHT_Y); // horiz right joystick
+    // Chassis.tank(leftJoy, tankRightJoy, -5);
+    Chassis.setBrakeMode(MOTOR_BRAKE_COAST);
+    // Chassis.setBrakeMode(MOTOR_BRAKE_BRAKE);
+
+    // Chassis.tank(leftJoy, tankRightJoy, 0);
+
+    // Chassis.curvature(abs(leftJoy) > 16 ? leftJoy: 0, abs(rightJoy) > 16 ?
+    // rightJoy: 0); Chassis.tank(abs(leftJoy) > 5 ? leftJoy: 0,
+    // abs(tankRightJoy) > 30 ? tankRightJoy: 0);
+    Chassis.arcade(leftJoy, 1.05 * rightJoy, 2);
+
+    // // DRIVE MODE TOGGLE
+    // if (controller.getDigital(ControllerDigital::left) == 1){
+    //   if (ArcadeTankToggle == 0) {
+    //     ArcadeTankToggle = 1;
+    //   }
+    //   if (ArcadeTankToggle == 2) {
+    //     ArcadeTankToggle = 3;
+    //   }
+    // }
+    // else if (controller.getDigital(ControllerDigital::left) == 0){
+    //   if (ArcadeTankToggle == 1) {
+    //     ArcadeTankToggle = 2;
+    //   }
+    //   if (ArcadeTankToggle == 3) {
+    //     ArcadeTankToggle = 0;
+    //   }
+    // }
+
+    // if (ArcadeTankToggle == 0 || ArcadeTankToggle == 3) { //ARCADE TOGGLE
+    //   //Chassis.arcade(leftJoy, 1.05*rightJoy, 2);
+    //   Chassis.tank(leftJoy, tankRightJoy, -7.5);
+    //   Chassis.setBrakeMode(MOTOR_BRAKE_COAST);
+    // }
+    // else if (ArcadeTankToggle == 1 || ArcadeTankToggle == 2) { //TANK TOGGLE
+    //   //Chassis.tank(leftJoy, tankRightJoy, -10);
+    //   Chassis.arcade(leftJoy, 1.05*rightJoy, 2);
+
+    //   Chassis.setBrakeMode(MOTOR_BRAKE_COAST);
+    // }
+
     pros::delay(10);
-
-    // function calls for intake, outtake, and shooter
-
-    pros::delay(50);
   }
 }
