@@ -1,8 +1,11 @@
 #include "main.h"
+#include "lemlib/api.hpp"
 #include "subsystems/drivetrain.hpp"
 #include "subsystems/globals.hpp"
 
-using namespace okapi::literals; //used for units
+#include "lemlib/api.hpp"
+
+using namespace okapi::literals; // used for units
 
 /**
  * A callback function for LLEMU's center button.
@@ -11,13 +14,13 @@ using namespace okapi::literals; //used for units
  * "I was pressed!" and nothing.
  */
 void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
+  static bool pressed = false;
+  pressed = !pressed;
+  if (pressed) {
+    pros::lcd::set_text(2, "I was pressed!");
+  } else {
+    pros::lcd::clear_line(2);
+  }
 }
 
 /**
@@ -27,10 +30,10 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
+  pros::lcd::initialize();
+  pros::lcd::set_text(1, "Hello PROS User!");
 
-	pros::lcd::register_btn1_cb(on_center_button);
+  pros::lcd::register_btn1_cb(on_center_button);
 }
 
 /**
@@ -62,9 +65,7 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {
-	
-}
+void autonomous() {}
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -80,26 +81,14 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-	okapi::Controller controller;
-	int intakeState = 0; //global state variable
-	//adding delay
-	okapi::Rate rate;
-	
-	while(true){
-		double leftJoystick = controller.getAnalog(okapi::ControllerAnalog::leftY);
-		double rightJoystick = controller.getAnalog(okapi::ControllerAnalog::rightX);
+  okapi::Controller controller;
 
-		chassis->getModel()->arcade(leftJoystick, rightJoystick*0.8); //sends power to drive, arcade mode
+  okapi::Rate rate;
 
-		
+  while (true) {
 
-		//function calls for intake, outtake, and shooter
-		updateIntake();
+    // function calls for intake, outtake, and shooter
 
-		updateOuttake();
-
-		updateShooter();
-		
-		pros::delay(50);
-	}
+    pros::delay(50);
+  }
 }
