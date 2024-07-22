@@ -75,24 +75,6 @@ lemlib::ControllerSettings turnPID{
 
 lemlib::Chassis Chassis(drive, movePID, turnPID, sensors);
 
-inline double remap(double d) {
-  if (d == 0) {
-    return 0;
-  }
-
-  double fp = d - (int)d;
-  int id = (int)d;
-
-  if (d > 0) {
-    id = id % 360;
-  } else {
-    id = (-id % 360) * -1 + 360;
-  }
-
-  d = id + fp;
-  return (d <= 180) ? d : (d - 360);
-}
-
 /*
   ______________________________________________________________________________________________
 
