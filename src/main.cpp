@@ -1,11 +1,70 @@
 #include "main.h"
 #include "lemlib/api.hpp"
-#include "subsystems/drivetrain.hpp"
+#include "pros/misc.h"
+#include "pros/misc.hpp"
+#include "pros/motors.h"
+#include "pros/rtos.hpp"
 #include "subsystems/globals.hpp"
 
 #include "lemlib/api.hpp"
 
 using namespace okapi::literals; // used for units
+
+int lF = 0;
+int lM = 0;
+int lB = 0;
+
+int rF = 0;
+int rM = 0;
+int rB = 0;
+
+pros::MotorGroup leftMotors({lF, lM, lB}, pros::MotorGearset::blue);
+pros::MotorGroup rightMotors({rF, rM, rB}, pros::MotorGearset::blue);
+
+pros::Imu imu(0);
+
+lemlib::Drivetrain drivetrain(&leftMotors, &rightMotors, 10, 3.25, 450, 8);
+
+lemlib::ControllerSettings movePID(10,  // kp
+                                   0,   // Ki
+                                   3,   // Kd
+                                   3,   // windup range
+                                   1,   // small error ragne
+                                   100, // small error range timeout (ms)
+                                   3,   // large error range
+                                   500, // large error range timeout (ms)
+                                   20   // slew
+);
+
+lemlib::ControllerSettings
+    turnPID(2,   // proportional gain (kP)
+            0,   // integral gain (kI)
+            10,  // derivative gain (kD)
+            3,   // anti windup
+            1,   // small error range, in degrees
+            100, // small error range timeout, in milliseconds
+            3,   // large error range, in degrees
+            500, // large error range timeout, in milliseconds
+            0    // maximum acceleration (slew)
+    );
+
+lemlib::OdomSensors sensors(nullptr, nullptr, nullptr, mullptr, &imu);
+
+// Driver control fn tanish
+//  lemlib::ExpoDriveCurve throttleCurve(3, // joystick deadband out of 127
+//                                       10, // minimum output where drivetrain
+//                                       will move out of 127 1.019 // expo
+//                                       curve gain
+//  );
+
+// // input curve for steer input during driver control
+// lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
+//                                   10, // minimum output where drivetrain will
+//                                   move out of 127 1.019 // expo curve gain
+// );
+
+lemlib::Chassis chassis(drivetrain, movePID, turnPID,
+                        sensors /*,&throttleCurve, //&steerCurve*/);
 
 /**
  * A callback function for LLEMU's center button.
@@ -31,9 +90,22 @@ void on_center_button() {
  */
 void initialize() {
   pros::lcd::initialize();
-  pros::lcd::set_text(1, "Hello PROS User!");
+  ` chassis.calibrate();
 
   pros::lcd::register_btn1_cb(on_center_button);
+
+  pros::Task screenTask([&]() {
+    while (true) {
+      // print robot location to the brain screen
+      pros::lcd::print(0, "X: %f", chassis.getPose().x);         // x
+      pros::lcd::print(1, "Y: %f", chassis.getPose().y);         // y
+      pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+      // log position telemetry
+      lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
+      // delay to save resources
+      pros::delay(50);
+    }
+  });
 }
 
 /**
@@ -81,11 +153,19 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-  okapi::Controller controller;
+  pros::Controller controller;
 
   okapi::Rate rate;
 
   while (true) {
+
+    // get joystick positions
+    int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
+    int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+    // move the chassis with curvature drive
+    chassis.arcade(leftY, rightX);
+    // delay to save resources
+    pros::delay(10);
 
     // function calls for intake, outtake, and shooter
 
