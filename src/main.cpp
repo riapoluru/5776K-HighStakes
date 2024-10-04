@@ -59,7 +59,7 @@ pros::Imu intertial1(1);
 // pros::Imu intertial2(imuPort2);
 
 lemlib::OdomSensors sensors{nullptr, // no tracking wheels
-                            nullptr, nullptr, nullptr, &intertial1};
+                            nullptr, nullptr, nullptr, nullptr};
 
 lemlib::ControllerSettings turnPID{
     2,   // kP
