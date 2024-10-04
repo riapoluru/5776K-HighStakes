@@ -1,5 +1,5 @@
 #include "main.h"
-#include "globals.hpp"
+// #include "globals.hpp"
 #include "pros/motors.h"
 #include "pros/rtos.hpp"
 #include "subsystems/auton.hpp"
@@ -59,7 +59,7 @@ pros::Imu intertial1(1);
 // pros::Imu intertial2(imuPort2);
 
 lemlib::OdomSensors sensors{nullptr, // no tracking wheels
-                            nullptr, nullptr, nullptr, nullptr};
+                            nullptr, nullptr, nullptr, &intertial1};
 
 lemlib::ControllerSettings turnPID{
     2,   // kP
